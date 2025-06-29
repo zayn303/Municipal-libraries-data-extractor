@@ -28,7 +28,7 @@ jobs:
 
       - name: Inject API key into config.py
         run: |
-          echo "API_KEY = '${{ secrets.API_KEY }}'" > extractor/config.py
+          echo "API_KEY = '${{ secrets.GOLEMIO_API_KEY }}'" > extractor/config.py
 
       - name: Ensure data folder exists
         run: mkdir -p data
