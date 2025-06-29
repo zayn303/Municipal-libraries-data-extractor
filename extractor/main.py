@@ -1,53 +1,79 @@
+import requests
 import json
-from datetime import datetime
+import csv
+import os
+from datetime import datetime, timezone
+from config import API_KEY
 
-# Load raw API response
-with open("data/libraries_raw.json", "r", encoding="utf-8") as f:
-    raw_data = json.load(f)
+# --- Configuration ---
+API_URL = "https://api.golemio.cz/v2/municipallibraries"
+DATA_DIR = "data"
+RAW_JSON_PATH = os.path.join(DATA_DIR, "libraries_raw.json")
+CLEAN_JSON_PATH = os.path.join(DATA_DIR, "libraries.json")
+CSV_PATH = os.path.join(DATA_DIR, "libraries.csv")
 
-features = raw_data.get("features", [])
-cleaned = []
+# --- Ensure data directory exists ---
+os.makedirs(DATA_DIR, exist_ok=True)
 
-today = datetime.now()
+# --- Fetch or load raw data ---
+if os.path.exists(RAW_JSON_PATH):
+    print("Raw JSON found. Loading from file...")
+    with open(RAW_JSON_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+else:
+    print("Raw JSON not found. Fetching from API...")
+    headers = {
+        "x-access-token": API_KEY,
+        "Accept": "application/json"
+    }
+    params = {
+        "latlng": "50.0755,14.4378",
+        "range": 12000,
+        "limit": 1000
+    }
+    response = requests.get(API_URL, headers=headers, params=params)
+    if response.status_code != 200:
+        print("Failed to fetch data from API:", response.status_code)
+        exit(1)
+    data = response.json()
+    with open(RAW_JSON_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print("Raw data saved.")
 
-def is_valid_now(entry):
-    from_date = entry.get("valid_from")
-    to_date = entry.get("valid_through")
+# --- Process data ---
+today = datetime.now(timezone.utc).date()
+libraries = []
 
-    if not from_date and not to_date:
-        return True
-
-    from_dt = datetime.fromisoformat(from_date[:-1]) if from_date else None
-    to_dt = datetime.fromisoformat(to_date[:-1]) if to_date else None
-
-    if from_dt and to_dt:
-        return from_dt <= today <= to_dt
-    elif from_dt:
-        return from_dt <= today
-    elif to_dt:
-        return today <= to_dt
-    else:
-        return False
-
-for feature in features:
+for feature in data.get("features", []):
     props = feature.get("properties", {})
     address = props.get("address", {})
     coords = feature.get("geometry", {}).get("coordinates", [None, None])
     opening_hours = props.get("opening_hours", [])
 
+    opening_description = ""
     if opening_hours:
         default_hours = [h for h in opening_hours if h.get("is_default")]
-        valid_fallback = [h for h in opening_hours if is_valid_now(h)]
-        hours_to_use = default_hours or valid_fallback
+        if default_hours:
+            used_hours = default_hours
+        else:
+            valid_hours = []
+            for h in opening_hours:
+                valid_from = h.get("valid_from")
+                valid_through = h.get("valid_through")
+                if valid_from and valid_through:
+                    from_date = datetime.fromisoformat(valid_from).date()
+                    through_date = datetime.fromisoformat(valid_through).date()
+                    if from_date <= today <= through_date:
+                        valid_hours.append(h)
+            used_hours = valid_hours if valid_hours else opening_hours
+
         formatted_hours = [
             f"{h.get('day_of_week')}: {h.get('opens')}–{h.get('closes')}"
-            for h in hours_to_use
+            for h in used_hours
         ]
         opening_description = "; ".join(formatted_hours)
-    else:
-        opening_description = None
 
-    cleaned.append({
+    libraries.append({
         "ID knižnice": props.get("id"),
         "Názov knižnice": props.get("name"),
         "Ulica": address.get("street_address"),
@@ -60,8 +86,16 @@ for feature in features:
         "Čas otvorenia": opening_description
     })
 
-# Save cleaned JSON
-with open("data/libraries_clean.json", "w", encoding="utf-8") as f:
-    json.dump(cleaned, f, ensure_ascii=False, indent=2)
+# --- Save cleaned JSON ---
+with open(CLEAN_JSON_PATH, "w", encoding="utf-8") as f:
+    json.dump(libraries, f, ensure_ascii=False, indent=2)
 
-print("Saved cleaned data to data/libraries_clean.json")
+# --- Save CSV ---
+with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=libraries[0].keys(), quoting=csv.QUOTE_ALL)
+    writer.writeheader()
+    writer.writerows(libraries)
+
+print("Clean data saved to:")
+print(" -", CLEAN_JSON_PATH)
+print(" -", CSV_PATH)
