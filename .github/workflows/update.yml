@@ -1,39 +1,40 @@
-name: Update Municipal Libraries
+name: Update Library Data
 
 on:
-  workflow_dispatch: 
+  schedule:
+    - cron: '0 5 * * *'  # Every day at 7:00 AM Prague time
+  workflow_dispatch:      
 
 jobs:
   extract:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Inject API key into config.py
-        env:
-          API_KEY: ${{ secrets.GOLEMIO_API_KEY }}
-        run: |
-          echo "API_KEY = '${API_KEY}'" > extractor/config.py
+    - name: Inject API key into config.py
+      run: |
+        echo "API_KEY = '${{ secrets.API_KEY }}'" > extractor/config.py
 
-      - name: Run extractor script
-        run: |
-          python extractor/main.py
+    - name: Run extractor script
+      run: python extractor/main.py
 
-      - name: Commit and push data changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/libraries.*
-          git commit -m "chore: update libraries data from GitHub Actions" || echo "No changes to commit"
-          git push
+    - name: Commit and push data changes
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add data/*.json data/*.csv
+        git commit -m "📡 Auto update library data"
+        git push
+      continue-on-error: true
