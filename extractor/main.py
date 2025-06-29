@@ -3,7 +3,10 @@ import json
 import csv
 import os
 from datetime import datetime, timezone
+import sys
+sys.path.insert(0, os.path.dirname(__file__))  # makes sure to load config.py from same folder
 from config import API_KEY
+
 
 # --- Configuration ---
 API_URL = "https://api.golemio.cz/v2/municipallibraries"
