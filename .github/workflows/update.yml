@@ -30,11 +30,8 @@ jobs:
     - name: Run extractor script
       run: python extractor/main.py
 
-    - name: Commit and push data changes
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git add data/*.json data/*.csv
-        git commit -m "Auto update library data"
-        git push
-      continue-on-error: true
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-library-data
+          path: data/
