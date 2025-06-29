@@ -30,8 +30,8 @@ jobs:
     - name: Run extractor script
       run: python extractor/main.py
 
-      - name: Upload outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-library-data
-          path: data/
+    - name: Upload outputs
+      uses: actions/upload-artifact@v4
+      with:
+        name: daily-library-data
+        path: data/
