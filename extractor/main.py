@@ -15,30 +15,26 @@ CSV_PATH = os.path.join(DATA_DIR, "libraries.csv")
 # --- Ensure data directory exists ---
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# --- Fetch or load raw data ---
-if os.path.exists(RAW_JSON_PATH):
-    print("Raw JSON found. Loading from file...")
-    with open(RAW_JSON_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-else:
-    print("Raw JSON not found. Fetching from API...")
-    headers = {
-        "x-access-token": API_KEY,
-        "Accept": "application/json"
-    }
-    params = {
-        "latlng": "50.0755,14.4378",
-        "range": 12000,
-        "limit": 1000
-    }
-    response = requests.get(API_URL, headers=headers, params=params)
-    if response.status_code != 200:
-        print("Failed to fetch data from API:", response.status_code)
-        exit(1)
-    data = response.json()
-    with open(RAW_JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    print("Raw data saved.")
+# --- Always fetch raw data from API ---
+print("Fetching fresh raw data from API...")
+headers = {
+    "x-access-token": API_KEY,
+    "Accept": "application/json"
+}
+params = {
+    "latlng": "50.0755,14.4378",
+    "range": 12000,
+    "limit": 1000
+}
+response = requests.get(API_URL, headers=headers, params=params)
+if response.status_code != 200:
+    print("Failed to fetch data from API:", response.status_code)
+    exit(1)
+
+data = response.json()
+with open(RAW_JSON_PATH, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+print("Raw data saved.")
 
 # --- Process data ---
 today = datetime.now(timezone.utc).date()
